@@ -1,6 +1,14 @@
 #ifndef PID_H
 #define PID_H
 
+
+enum TWIDDLE_STATUS{
+  STATUS_INIT,
+
+  STATUS_INC,
+  STATUS_DEC,
+};
+
 class PID {
 public:
   /*
@@ -16,6 +24,22 @@ public:
   double Kp;
   double Ki;
   double Kd;
+
+	/*
+  * Coefficients for Twiddle
+  */
+  TWIDDLE_STATUS  status;
+  int p_id;
+  double dKp;
+  double dKi;
+  double dKd;
+
+  double best_Kp;
+  double best_Ki;
+  double best_Kd;
+  double best_err;
+  double error;
+  int cnt;
 
   /*
   * Constructor
@@ -38,9 +62,19 @@ public:
   void UpdateError(double cte);
 
   /*
+  * reset PID variables.
+  */
+  void resetError();
+
+  /*
   * Calculate the total PID error.
   */
   double TotalError();
+
+private:
+  bool initialized;
+  double prev_cte;
 };
+
 
 #endif /* PID_H */

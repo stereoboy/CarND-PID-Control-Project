@@ -34,8 +34,27 @@ int main()
 
   PID pid;
   // TODO: Initialize the pid variable.
+	int i = 0;
+//  double Kp = 0.2;
+//  double Kd = 3.0;
+//  double Ki = 0.004;
+  double Kp = 0.22;
+  double Kd = 3.0;
+  double Ki = 0.00436;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  pid.Init(Kp, Ki, Kd);
+
+  double *p[3];
+  double *dp[3];
+  p[0] = &pid.Kp;
+  p[1] = &pid.Kd;
+  p[2] = &pid.Ki;
+
+  dp[0] = &pid.dKp;
+  dp[1] = &pid.dKd;
+  dp[2] = &pid.dKi;
+
+  h.onMessage([&pid, &i, &p, &dp](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -57,7 +76,121 @@ int main()
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
-          
+          //std::cout <<"[" << i << "]" << std::endl;
+          pid.UpdateError(cte);
+
+          steer_value = -pid.Kp*pid.p_error -pid.Kd*pid.d_error -pid.Ki*pid.i_error;
+
+//					std::cout <<  pid.Kp << std::endl;
+//          std::cout <<  pid.Kd << std::endl;
+//          std::cout <<  pid.Ki << std::endl;
+//
+//          std::cout <<  pid.p_error << std::endl;
+//          std::cout <<  pid.d_error << std::endl;
+//          std::cout <<  pid.i_error << std::endl;
+//
+//          std::cout <<  pid.Kp*pid.p_error << std::endl;
+//          std::cout <<  pid.Kd*pid.d_error << std::endl;
+//          std::cout <<  pid.Ki*pid.i_error << std::endl;
+
+          if (steer_value > 1.0)
+            steer_value = 1.0;
+          else  if (steer_value < -1.0)
+            steer_value = -1.0;
+
+					i++;
+
+          //
+          // update Kp, Kd, Ki using TWIDDLE logic
+          //
+				  if (i == 1500 /* 1 loop approximately */)
+          {
+            std::cout <<"[" << pid.cnt << "]#####################################" << std::endl;
+
+            std::cout << "<best>=======" << std::endl;
+            std::cout <<  "best_err" << pid.best_err << std::endl;
+            std::cout <<  pid.best_Kp << std::endl;
+            std::cout <<  pid.best_Kd << std::endl;
+            std::cout <<  pid.best_Ki << std::endl;
+            std::cout << "<current>=======" << std::endl;
+            std::cout <<  pid.Kp << std::endl;
+            std::cout <<  pid.Kd << std::endl;
+            std::cout <<  pid.Ki << std::endl;
+            std::cout << "---------------" << std::endl;
+            std::cout <<  pid.dKp << std::endl;
+            std::cout <<  pid.dKd << std::endl;
+            std::cout <<  pid.dKi << std::endl;
+            std::cout << "================" << std::endl;
+
+            double error = pid.error/i;
+            std::cout << "error=" << error << std::endl;
+
+            switch(pid.status)
+            {
+              case STATUS_INIT: //
+                std::cout<<"initialize"<< std::endl;
+                pid.best_err = error;
+                pid.best_Kp = pid.Kp;
+                pid.best_Kd = pid.Kd;
+                pid.best_Ki = pid.Ki;
+
+                pid.status = STATUS_INC;
+                *p[pid.p_id] += *dp[pid.p_id]; // try to increase Kp
+                break;
+
+              case STATUS_INC: // after increasing Kp
+                if (error < pid.best_err)
+                {
+                  std::cout<<"cond INC" << pid.p_id << "- A"<< std::endl;
+                  pid.best_err = error;
+                  pid.best_Kp = pid.Kp;
+                  pid.best_Kd = pid.Kd;
+                  pid.best_Ki = pid.Ki;
+
+                  *dp[pid.p_id] *= 1.1;
+                  std::cout << "Increase " << pid.p_id<< std::endl;
+
+                  pid.p_id = (pid.p_id + 1)%3;
+                  pid.status = STATUS_INC;
+                  *p[pid.p_id] += *dp[pid.p_id]; // try to increase Kx
+                }
+                else
+                {
+                  std::cout<<"cond INC" << pid.p_id << " - B"<< std::endl;
+                  *p[pid.p_id] -= 2*(*dp[pid.p_id]); // try to decrease Kx
+                  pid.status = STATUS_DEC;
+                }
+                break;
+
+              case STATUS_DEC: // after decreasing Kx
+                if (error < pid.best_err)
+                {
+                  std::cout<<"cond DEC" << pid.p_id << " - A"<< std::endl;
+                  pid.best_err = error;
+                  pid.best_Kp = pid.Kp;
+                  pid.best_Kd = pid.Kd;
+                  pid.best_Ki = pid.Ki;
+
+                  *dp[pid.p_id] *=  1.1;
+                  std::cout << "Decrease " << pid.p_id<< std::endl;
+                }
+                else
+                {
+                  std::cout<<"cond DEC" << pid.p_id << " - B"<< std::endl;
+                  *p[pid.p_id] += *dp[pid.p_id]; // recover Kx
+                  *dp[pid.p_id] *= 0.9;
+                }
+
+                pid.p_id = (pid.p_id + 1)%3;
+                pid.status = STATUS_INC;
+                *p[pid.p_id] += *dp[pid.p_id]; // try to increase Kx
+                break;
+
+            }
+            pid.resetError();
+            i = 0;
+          }
+
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
 
