@@ -28,8 +28,13 @@ The car trajectory in the experiment video looks similar as the previous one. Bu
 
 [pid.mp4](./pid.mp4)
 
+### Describe how the final hyperparameters were chosen.
 
-**Final Result:** [video.mp4](./video.mp4), I recorded full video for one laps.
+* Student discusses how they chose the final hyperparameters (P, I, D coefficients). This could be have been done through manual tuning, twiddle, SGD, or something else, or a combination!
+
+At first I tune all parameters manually by following lecture note's parameters (Kp = 0.2, Kd = 3.0, Ki = 0.004). The result is not bad. After then I finetune all parameter by using TWIDDLE algorithm. after 20 iteration I fixed parameters: Kp = 0.22, Kd = 3.0, Ki = 0.00436
+
+I think that SGD is more clear and powerful method for these kind of problems. But I want to test and implement TWIDDLE algorithm by myself.
 
 [final_result.mp4](./final_result.mp4)
 
